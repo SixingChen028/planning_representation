@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import pickle
+import torch
 
 import gymnasium as gym
 from gymnasium import Wrapper 
@@ -23,6 +24,8 @@ class GraphEnv(gym.Env):
             reward_set,
             adj_list = None,
             adj_matrix = None,
+            t_ponder = 5,
+            t_act = 5,
         ):
         """
         Construct an environment.
@@ -31,8 +34,8 @@ class GraphEnv(gym.Env):
         self.num_state = num_state
         self.reward_set = reward_set
 
-        self.t_ponder = 5
-        self.t_act = 5
+        self.t_ponder = t_ponder
+        self.t_act = t_act
 
         # initialize the graph
         self.graph = Graph(adj_list = adj_list, adj_matrix = adj_matrix)
@@ -78,6 +81,7 @@ class GraphEnv(gym.Env):
             'state': self.state,
             'rewards': self.graph.rewards,
             'stage': self.stage,
+            'mask': self.get_action_mask(),
         }
 
         return obs, info
@@ -94,21 +98,18 @@ class GraphEnv(gym.Env):
 
         # pondering stage
         if self.stage == 0:
-            # punishment for physical actions
             if action != 2:
-                reward = -10.
+                raise ValueError('Execute decision action in pondering stage.')
 
         # decision stage
         elif self.stage == 1:
-            # punishment for fixation actions
-            if action == 2:
-                reward = -10.
-
-            # state transition
-            else:
+            if action != 2:
                 # state transition: (s, a) -> (s', r)
                 self.state = self.graph.successors(self.state)[action] # ignore repetitive visiting
                 reward = self.graph.rewards[self.state]
+        
+            elif action == 2:
+                raise ValueError('Execute pondering action in decision stage.')
 
         # stage transition
         if self.timer == self.t_ponder:
@@ -131,9 +132,29 @@ class GraphEnv(gym.Env):
             'state': self.state,
             'rewards': self.graph.rewards,
             'stage': self.stage,
+            'mask': self.get_action_mask(),
         }
         
         return obs, reward, done, False, info
+    
+
+    def get_action_mask(self):
+        """
+        Get action mask.
+        """
+        batch_size = 1
+        mask = torch.zeros((batch_size, self.action_space.n), dtype = torch.bool)
+
+        # pondering stage
+        if self.stage == 0:
+            mask[0, 2] = True
+
+        # decision stage
+        elif self.stage == 1:
+            mask[0, 0] = True
+            mask[0, 1] = True
+        
+        return mask
 
 
     def one_hot_coding(self, num_classes, labels = None):
@@ -239,7 +260,6 @@ class MetaLearningWrapper(Wrapper):
 
 
 if __name__ == '__main__':
-    # testing
 
     adj_dict = {
         0: [9, 27], 1: [22, 28], 2: [22, 10], 3: [2, 23],

@@ -1,5 +1,7 @@
 import numpy as np
-import matplotlib.pyplot as plt
+import time
+import pickle
+import argparse
 
 import gymnasium as gym
 from gymnasium import Wrapper 
@@ -12,9 +14,27 @@ from environment import *
 from modules import *
 from trainer import *
 
+# parse args
+parser = argparse.ArgumentParser()
 
-# parameters
-num_episodes = 1000000
+parser.add_argument('--num_episodes', type = int, default = 3500000, help = 'training episodes')
+
+parser.add_argument('--hidden_size', type = int, default = 128, help = 'lstm hidden size')
+parser.add_argument('--policy_hidden_size', type = int, default = 32, help = 'policy head hidden size')
+parser.add_argument('--value_hidden_size', type = int, default = 32, help = 'value head hidden size')
+parser.add_argument('--prediction_hidden_size', type = int, default = 32, help = 'prediction head hidden size')
+
+parser.add_argument('--t_ponder', type = int, default = 5, help = 'pondering time steps')
+parser.add_argument('--t_act', type = int, default = 5, help = 'acting time steps')
+
+parser.add_argument('--lr', type = float, default = 3e-4, help = 'learning rate')
+parser.add_argument('--gamma', type = float, default = 0.9, help = 'temporal discount')
+parser.add_argument('--beta_v', type = float, default = 0.05, help = 'value loss coefficient')
+parser.add_argument('--beta_e', type = float, default = 0.05, help = 'entropy regularization coefficient')
+parser.add_argument('--beta_p', type = float, default = 0.5, help = 'predictive loss coefficient')
+
+args = parser.parse_args()
+
 path = '/home/sc10264/samplingrnn/code_planning_representation/results'
 
 # create adjacency matrix
@@ -38,33 +58,35 @@ env = GraphEnv(
     num_state = 32,
     reward_set = np.concatenate([np.repeat(1, 10), np.repeat(-1, 21), np.array([5])]),
     adj_matrix = adj_matrix,
+    t_ponder = args.t_ponder,
+    t_act = args.t_act,
 )
 env = MetaLearningWrapper(env)
 
-# set network
+# set net
 net = RecurrentActorCriticPolicy(
     feature_dim = env.observation_space.shape[0],
     action_dim = env.action_space.n,
     state_dim = env.num_state,
-    lstm_hidden_dim = 128,
-    policy_hidden_dim = 32,
-    value_hidden_dim = 32,
-    prediction_hidden_dim = 32,
+    lstm_hidden_dim = args.hidden_size,
+    policy_hidden_dim = args.policy_hidden_size,
+    value_hidden_dim = args.value_hidden_size,
+    prediction_hidden_dim = args.prediction_hidden_size,
 )
 
-# training
+# network training
 a2c = A2C(
     net = net,
     env = env,
-    lr = 3e-4,
-    gamma = 0.9,
-    beta_v = 0.05,
-    beta_e = 0.05,
-    beta_p = 0.5,
+    lr = args.lr,
+    gamma = args.gamma,
+    beta_v = args.beta_v,
+    beta_e = args.beta_e,
+    beta_p = args.beta_p,
     # lr_schedule = np.linspace(3e-4, 1e-4, num = 30000),
 )
 
-# save training results
-data = a2c.learn(num_episodes = 2000000)
+# save data
+data = a2c.learn(num_episodes = args.num_episodes, print_frequency = 100)
 a2c.save_net(path + '/net.pth')
 pickle.dump(data, open(path + '/data.p', 'wb'))

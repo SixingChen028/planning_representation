@@ -7,4 +7,4 @@
 #SBATCH -o /home/sc10264/samplingrnn/code_planning_representation/results/slurm-%A_%a.out
 #SBATCH --array=0
 
-python -u training.py
+python -u training.py --jobid=$SLURM_ARRAY_TASK_ID

@@ -147,7 +147,7 @@ class A2C:
         # iterate through a trial
         while not done:
             # step the net
-            action, policy, log_prob, entropy, value, state_prediction, reward_prediction, states_actor, states_critic = self.net(obs, states_actor, states_critic)
+            action, policy, log_prob, entropy, value, state_prediction, reward_prediction, states_actor, states_critic = self.net(obs, states_actor, states_critic, mask = info['mask'])
 
             # step the env
             obs, reward, done, truncated, info = self.env.step(action.item())
@@ -164,7 +164,7 @@ class A2C:
             state_predictions.append(state_prediction)
 
         # process the last timestep
-        action, policy, log_prob, entropy, value, state_prediction, reward_prediction, states_actor, states_critic = self.net(obs, states_actor, states_critic)
+        action, policy, log_prob, entropy, value, state_prediction, reward_prediction, states_actor, states_critic = self.net(obs, states_actor, states_critic, mask = info['mask'])
         values.append(value.view(-1)) # values have one more step
 
         # concatenate recordings
